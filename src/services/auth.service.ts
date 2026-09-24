@@ -38,7 +38,7 @@ export const loginService = async (credentials: any) => {
       role: user.role 
     }, 
     process.env.JWT_SECRET, 
-    { expiresIn: '8h' } // El token se vence en 8 horas por seguridad
+    { expiresIn: '2h' } // El token se vence en 2 horas por seguridad
   );
 
   //  Retornamos el token y los datos del usuario (pero le mochamos la contraseña)
