@@ -3,6 +3,7 @@ dotenv.config();
 
 import express, { Request, Response } from 'express';
 import userRoutes from './routes/user.routes';
+import authRoutes from './routes/auth.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,7 @@ routerV1.get('/health', (req: Request, res: Response) => {
 
 // Enganchamos las rutas de usuarios a la v1
 routerV1.use('/users', userRoutes);
+routerV1.use('/auth', authRoutes);
 
 // Montamos TODA la v1 bajo el prefijo /api/v1
 app.use('/api/v1', routerV1);
