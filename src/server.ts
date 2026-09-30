@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Request, Response } from 'express';
 import userRoutes from './routes/user.routes';
 import authRoutes from './routes/auth.routes';
+import { notFoundHandler, globalErrorHandler } from './middlewares/error.middleware';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,7 +24,9 @@ routerV1.use('/auth', authRoutes);
 
 // Montamos TODA la v1 bajo el prefijo /api/v1
 app.use('/api/v1', routerV1);
-// ==========================================
+//Middlewares
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);

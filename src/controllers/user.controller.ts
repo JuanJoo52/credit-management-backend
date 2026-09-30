@@ -1,7 +1,8 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { createUserService } from '../services/user.service';
 
-export const createUser = async (req: Request, res: Response): Promise<void> => {
+
+export const createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const newUser = await createUserService(req.body);
     
@@ -11,9 +12,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       data: newUser
     });
   } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    next(error);
+    
   }
 };
