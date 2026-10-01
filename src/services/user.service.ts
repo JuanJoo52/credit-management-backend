@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { AppError } from '../errors/app.error';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ export const createUserService = async (userData: any) => {
     
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
-        throw new Error('La contraseña debe tener al menos 8 caracteres, una mayúscula y un número');
+        throw new AppError('La contraseña debe tener al menos 8 caracteres, una mayúscula y un número',400);
     }
     // verificamos que el correo no esté repetido en la bd
     const existingUser = await prisma.user.findUnique({
@@ -16,7 +17,7 @@ export const createUserService = async (userData: any) => {
     });
 
     if (existingUser) {
-        throw new Error('User already exists with this email');
+        throw new AppError('User already exists with this email',409);
     }
 
     // toca hashear la contraseña, ni a palo guardarla en texto plano
