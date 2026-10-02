@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createUser } from '../../controllers/user.controller';
+import { createUser, updateUserController } from '../../controllers/user.controller';
 import { verifyToken, requireRoles } from '../../middlewares/auth.middleware';
 const router = Router();
 
@@ -10,4 +10,12 @@ router.post('/',
     requireRoles(['ADMIN']),
      createUser);
 
+ //Endpoint actualizacion o desactivacion hu04
+router.patch(
+  '/:id',
+  verifyToken,
+  requireRoles(['ADMIN']),
+  updateUserController
+);
 export default router;
+

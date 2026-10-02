@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { AppError } from '../errors/app.error';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -14,7 +15,7 @@ export const loginService = async (credentials: any) => {
 
   // Nunca le decimos al cliente "El correo no existe" o "La clave es incorrecta"  si no Credenciales inválidas" 
   if (!user) {
-    throw new Error('Credenciales inválidas');
+    throw new AppError('Credenciales inválidas',401);
   }
 
   //  Comparamos la contraseña en texto plano contra el hash de la base de datos
@@ -24,6 +25,9 @@ export const loginService = async (credentials: any) => {
     throw new Error('Credenciales inválidas');
   }
 
+  if (user.status !== 'ACTIVE') {
+    throw new AppError('Usuario inactivo. Acceso denegado.', 401);
+  }
 
   if (!process.env.JWT_SECRET) {
     throw new Error('Error crítico del servidor: JWT_SECRET no está definido');
@@ -33,17 +37,17 @@ export const loginService = async (credentials: any) => {
   // En el payload metemos el ID y el ROL. 
   // El ROL es vital meterlo aquí, porque es lo que usaremos después para bloquear el HU-01 a solo ADMINS.
   const token = jwt.sign(
-    { 
-      userId: user.id, 
-      role: user.role 
-    }, 
-    process.env.JWT_SECRET, 
+    {
+      userId: user.id,
+      role: user.role
+    },
+    process.env.JWT_SECRET,
     { expiresIn: '2h' } // El token se vence en 2 horas por seguridad
   );
 
   //  Retornamos el token y los datos del usuario (pero le mochamos la contraseña)
   const { passwordHash, ...userWithoutPassword } = user;
-  
+
   return {
     token,
     user: userWithoutPassword
