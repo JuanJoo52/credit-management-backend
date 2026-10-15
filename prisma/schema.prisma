@@ -29,3 +29,23 @@ model User {
 
   @@map("users")
 }
+enum DocumentType {
+  CC
+  CE
+  PASSPORT
+}
+
+model Customer {
+  id             Int          @id @default(autoincrement())
+  documentType   DocumentType
+  documentNumber String       @unique
+  firstName      String
+  lastName       String
+  monthlyIncome  Float
+  address        String
+  phone          String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("customers")
+}
