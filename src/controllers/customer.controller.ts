@@ -25,4 +25,17 @@ export class CustomerController {
             next(error);
         }
     }
+    static async updateByDocument(req: Request, res: Response, next: NextFunction) {
+        try {
+            const documentNumber = req.params.documentNumber as string;
+            const updatedCustomer = await CustomerService.updateCustomer(documentNumber, req.body, req.body);
+
+            return res.status(200).json({
+                message: 'Datos del cliente actualizados exitosamente',
+                data: updatedCustomer,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }

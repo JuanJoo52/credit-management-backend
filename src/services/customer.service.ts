@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/app.error';
-import { CreateCustomerDTO } from '../types/customer.types';
+import { CreateCustomerDTO, UpdateCustomerDTO } from '../types/customer.types';
 
 const prisma = new PrismaClient();
 
@@ -65,6 +65,54 @@ export class CustomerService {
         }
 
         return customer;
+    }
+    // HU-07: Actualizar datos de contacto e ingresos del cliente
+    static async updateCustomer(documentNumber: string, data: UpdateCustomerDTO, bodyPayload: any) {
+        // 1. Validar formato numérico del parámetro de ruta
+        if (!documentNumber || !/^\d+$/.test(documentNumber)) {
+            throw new AppError('El número de documento ingresado debe tener un formato numérico válido', 400);
+        }
+
+        // 2. Regla defensiva: Inmutabilidad del número y tipo de documento
+        if (bodyPayload.documentNumber !== undefined || bodyPayload.documentType !== undefined) {
+            throw new AppError('El número y tipo de documento son inmutables y no se pueden modificar', 400);
+        }
+
+        // 3. Validar que se envíe al menos un campo permitido para actualizar
+        if (data.monthlyIncome === undefined && data.address === undefined && data.phone === undefined) {
+            throw new AppError('Debe proporcionar al menos un campo válido para actualizar (monthlyIncome, address o phone)', 400);
+        }
+
+        // 4. Verificar existencia previa en base de datos
+        const existingCustomer = await prisma.customer.findUnique({
+            where: { documentNumber },
+        });
+
+        if (!existingCustomer) {
+            throw new AppError('Cliente no encontrado con el número de documento proporcionado', 404);
+        }
+
+        // 5. Validar que los ingresos declarados sean estrictamente positivos si se incluyen en el body
+        if (data.monthlyIncome !== undefined) {
+            if (typeof data.monthlyIncome !== 'number' || data.monthlyIncome <= 0) {
+                throw new AppError('Los ingresos mensuales declarados deben ser un valor positivo mayor a cero', 400);
+            }
+        }
+
+        // 6. Validar formato del teléfono si se incluye en el body
+        if (data.phone !== undefined && !/^\d+$/.test(data.phone)) {
+            throw new AppError('El número de teléfono debe contener solo dígitos numéricos', 400);
+        }
+
+        // 7. Actualización parcial en PostgreSQL vía Prisma
+        return await prisma.customer.update({
+            where: { documentNumber },
+            data: {
+                ...(data.monthlyIncome !== undefined && { monthlyIncome: data.monthlyIncome }),
+                ...(data.address !== undefined && { address: data.address }),
+                ...(data.phone !== undefined && { phone: data.phone }),
+            },
+        });
     }
 
 }

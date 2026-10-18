@@ -9,5 +9,6 @@ router.use(requireRoles(['ADMIN', 'ADVISOR']));
 
 router.post('/', CustomerController.create);
 router.get('/by-document/:documentNumber', CustomerController.getByDocument);
+router.patch('/by-document/:documentNumber', CustomerController.updateByDocument);
 
 export default router;
