@@ -8,5 +8,6 @@ router.use(verifyToken);
 router.use(requireRoles(['ADMIN', 'ADVISOR']));
 
 router.post('/', CustomerController.create);
+router.get('/by-document/:documentNumber', CustomerController.getByDocument);
 
 export default router;
