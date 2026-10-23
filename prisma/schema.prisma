@@ -44,8 +44,58 @@ model Customer {
   monthlyIncome  Float
   address        String
   phone          String
+  creditRequests CreditRequest[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@map("customers")
+}
+enum CreditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DISBURSED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model CreditRequest {
+  id              Int           @id @default(autoincrement())
+  amount          Float
+  termMonths      Int
+  destination     String
+  status          CreditStatus  @default(PENDING)
+  rejectionReason String?
+  
+  customerId      Int
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  
+  installments    Installment[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("credit_requests")
+}
+
+model Installment {
+  id                Int               @id @default(autoincrement())
+  installmentNumber Int
+  dueDate           DateTime
+  principal         Float
+  interest          Float
+  totalAmount       Float
+  status            InstallmentStatus @default(PENDING)
+
+  creditRequestId   Int
+  creditRequest     CreditRequest     @relation(fields: [creditRequestId], references: [id])
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("installments")
 }
