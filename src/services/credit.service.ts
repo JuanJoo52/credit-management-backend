@@ -1,6 +1,8 @@
 import { PrismaClient, CreditStatus } from '@prisma/client';
 import { AppError } from '../errors/app.error';
-import { CreateCreditRequestDTO } from '../types/credit.types';
+import { CreateCreditRequestDTO, EvaluateCreditRequestDTO } from '../types/credit.types';
+import { FinancialService } from './financial.service';
+
 
 const prisma = new PrismaClient();
 
@@ -67,5 +69,78 @@ export class CreditService {
     });
 
     return creditRequest;
+  }
+  static async evaluateCreditRequest(id: number, data: EvaluateCreditRequestDTO) {
+    const { status, rejectionReason } = data;
+
+    // Validar que el estado enviado sea estrictamente APPROVED o REJECTED
+    if (!status || (status !== 'APPROVED' && status !== 'REJECTED')) {
+      throw new AppError('El estado enviado es inválido. Debe ser APPROVED o REJECTED', 400);
+    }
+    //
+    if (status === 'REJECTED' && (!rejectionReason || !rejectionReason.trim())) {
+      throw new AppError('Es obligatorio proporcionar la razón del rechazo (rejectionReason) al rechazar una solicitud', 400);
+    }
+
+    //  Buscar la solicitud de crédito con el cliente asociado
+    const creditRequest = await prisma.creditRequest.findUnique({
+      where: { id },
+      include: { customer: true },
+    });
+
+    if (!creditRequest) {
+      throw new AppError('Solicitud de crédito no encontrada', 404);
+    }
+
+    // Inmutabilidad: Verificar que se encuentre en estado PENDING
+    if (creditRequest.status !== CreditStatus.PENDING) {
+      throw new AppError('La solicitud ya fue evaluada previamente y no puede modificarse', 400);
+    }
+
+    //  Evaluar Capacidad de Pago al 40% si la decisión del ADMIN es APROBAR
+    if (status === 'APPROVED') {
+      const estimatedInstallment = FinancialService.calculateFrenchAmortizationInstallment(
+        creditRequest.amount,
+        creditRequest.termMonths
+      );
+
+      const hasCapacity = FinancialService.isPaymentCapacityValid(
+        estimatedInstallment,
+        creditRequest.customer.monthlyIncome
+      );
+
+      if (!hasCapacity) {
+        const maxCapacity = creditRequest.customer.monthlyIncome * 0.40;
+        throw new AppError(
+          `La cuota mensual estimada ($${estimatedInstallment.toLocaleString()}) excede el 40% de la capacidad de pago del cliente ($${maxCapacity.toLocaleString()})`,
+          400
+        );
+      }
+    }
+
+    // Determinar el enum exacto de Prisma
+    const targetStatus: CreditStatus = status === 'APPROVED' ? CreditStatus.APPROVED : CreditStatus.REJECTED;
+
+    // Actualizar en la base de datos PostgreSQL y retornar el resultado
+    const updatedCreditRequest = await prisma.creditRequest.update({
+      where: { id },
+      data: {
+        status: targetStatus,
+        rejectionReason: targetStatus === CreditStatus.REJECTED
+          ? rejectionReason!.trim(): null,
+      },
+      include: {
+        customer: {
+          select: {
+            documentNumber: true,
+            firstName: true,
+            lastName: true,
+            monthlyIncome: true,
+          },
+        },
+      },
+    });
+
+    return updatedCreditRequest;
   }
 }

@@ -8,5 +8,7 @@ router.use(verifyToken);
 
 // HU-08: Permitido exclusivamente para ADMIN y ADVISOR
 router.post('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.create);
+// HU-09: Reservado exclusivamente para ADMIN
+router.patch('/:id/evaluate', requireRoles(['ADMIN']), CreditController.evaluate);
 
 export default router;

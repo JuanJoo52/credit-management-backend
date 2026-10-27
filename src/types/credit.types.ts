@@ -4,3 +4,8 @@ export interface CreateCreditRequestDTO {
   termMonths: number;
   destination: string;
 }
+
+export interface EvaluateCreditRequestDTO {
+  status: 'APPROVED' | 'REJECTED';
+  rejectionReason?: string;
+}
