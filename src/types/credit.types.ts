@@ -9,3 +9,8 @@ export interface EvaluateCreditRequestDTO {
   status: 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
 }
+
+export interface CreditFilterDTO {
+  status?: string;
+  documentNumber?: string;
+}

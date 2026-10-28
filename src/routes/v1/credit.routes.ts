@@ -10,5 +10,7 @@ router.use(verifyToken);
 router.post('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.create);
 // HU-09: Reservado exclusivamente para ADMIN
 router.patch('/:id/evaluate', requireRoles(['ADMIN']), CreditController.evaluate);
+// HU-10: Listado y filtrado de solicitudes para ADMIN y ADVISOR
+router.get('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.getCredits);
 
 export default router;

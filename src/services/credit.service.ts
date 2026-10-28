@@ -1,6 +1,6 @@
 import { PrismaClient, CreditStatus } from '@prisma/client';
 import { AppError } from '../errors/app.error';
-import { CreateCreditRequestDTO, EvaluateCreditRequestDTO } from '../types/credit.types';
+import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO } from '../types/credit.types';
 import { FinancialService } from './financial.service';
 
 
@@ -143,4 +143,45 @@ export class CreditService {
 
     return updatedCreditRequest;
   }
+  
+
+//HU-10
+static async getCredits(filters: CreditFilterDTO) {
+  const { status, documentNumber } = filters;
+
+  const whereClause: any = {};
+
+  if (status) {
+    const uppercaseStatus = status.toUpperCase();
+    if (!Object.values(CreditStatus).includes(uppercaseStatus as CreditStatus)) {
+      throw new AppError(`El estado '${status}' no es un filtro válido`, 400);
+    }
+    whereClause.status = uppercaseStatus as CreditStatus;
+  }
+
+  if (documentNumber) {
+    whereClause.customer = {
+      documentNumber: documentNumber.trim(),
+    };
+  }
+
+  const credits = await prisma.creditRequest.findMany({
+    where: whereClause,
+    include: {
+      customer: {
+        select: {
+          documentNumber: true,
+          firstName: true,
+          lastName: true,
+          monthlyIncome: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return credits;
+}
 }

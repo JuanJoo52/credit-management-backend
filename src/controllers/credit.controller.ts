@@ -33,4 +33,24 @@ export class CreditController {
       next(error);
     }
   }
+  static async getCredits(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { status, documentNumber } = req.query;
+
+    const filters = {
+      status: status ? String(status) : undefined,
+      documentNumber: documentNumber ? String(documentNumber) : undefined,
+    };
+
+    const credits = await CreditService.getCredits(filters);
+
+    return res.status(200).json({
+      message: 'Listado de solicitudes de crédito obtenido exitosamente',
+      count: credits.length,
+      data: credits,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 }
