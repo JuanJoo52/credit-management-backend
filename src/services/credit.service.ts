@@ -198,4 +198,37 @@ export class CreditService {
 
     return FinancialService.generateAmortizationSchedule(amount, termMonths);
   }
+  // HU-12
+  static async getCreditById(id: number) {
+    if (isNaN(id) || id <= 0) {
+      throw new AppError('El ID de la solicitud debe ser un número entero válido mayor a 0', 400);
+    }
+
+    const creditRequest = await prisma.creditRequest.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            documentNumber: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            monthlyIncome: true,
+          },
+        },
+        installments: {
+          orderBy: {
+            installmentNumber: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!creditRequest) {
+      throw new AppError(`No se encontró ninguna solicitud de crédito con el ID ${id}`, 404);
+    }
+
+    return creditRequest;
+  }
 }

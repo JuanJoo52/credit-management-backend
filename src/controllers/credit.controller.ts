@@ -84,4 +84,19 @@ export class CreditController {
       next(error);
     }
   }
+  // Dentro de la clase CreditController:
+  static async getById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+
+      const creditRequest = await CreditService.getCreditById(id);
+
+      return res.status(200).json({
+        message: 'Detalle de la solicitud de crédito obtenido exitosamente',
+        data: creditRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
