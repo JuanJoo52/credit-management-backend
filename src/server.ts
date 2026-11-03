@@ -4,11 +4,13 @@ dotenv.config();
 import express from 'express';
 import v1Routes from './routes/v1';
 import { notFoundHandler, globalErrorHandler } from './middlewares/error.middleware';
+import { jsonErrorHandler } from './middlewares/jsonErrorHandler.middleware';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(jsonErrorHandler);
 
 app.use('/api/v1',  v1Routes);
 //Middlewares

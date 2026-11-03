@@ -1,6 +1,6 @@
 import { PrismaClient, CreditStatus } from '@prisma/client';
 import { AppError } from '../errors/app.error';
-import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO } from '../types/credit.types';
+import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO, SimulateCreditDTO, AmortizationSimulationResponse } from '../types/credit.types';
 import { FinancialService } from './financial.service';
 
 
@@ -127,7 +127,7 @@ export class CreditService {
       data: {
         status: targetStatus,
         rejectionReason: targetStatus === CreditStatus.REJECTED
-          ? rejectionReason!.trim(): null,
+          ? rejectionReason!.trim() : null,
       },
       include: {
         customer: {
@@ -143,45 +143,59 @@ export class CreditService {
 
     return updatedCreditRequest;
   }
-  
 
-//HU-10
-static async getCredits(filters: CreditFilterDTO) {
-  const { status, documentNumber } = filters;
 
-  const whereClause: any = {};
+  //HU-10
+  static async getCredits(filters: CreditFilterDTO) {
+    const { status, documentNumber } = filters;
 
-  if (status) {
-    const uppercaseStatus = status.toUpperCase();
-    if (!Object.values(CreditStatus).includes(uppercaseStatus as CreditStatus)) {
-      throw new AppError(`El estado '${status}' no es un filtro válido`, 400);
+    const whereClause: any = {};
+
+    if (status) {
+      const uppercaseStatus = status.toUpperCase();
+      if (!Object.values(CreditStatus).includes(uppercaseStatus as CreditStatus)) {
+        throw new AppError(`El estado '${status}' no es un filtro válido`, 400);
+      }
+      whereClause.status = uppercaseStatus as CreditStatus;
     }
-    whereClause.status = uppercaseStatus as CreditStatus;
-  }
 
-  if (documentNumber) {
-    whereClause.customer = {
-      documentNumber: documentNumber.trim(),
-    };
-  }
+    if (documentNumber) {
+      whereClause.customer = {
+        documentNumber: documentNumber.trim(),
+      };
+    }
 
-  const credits = await prisma.creditRequest.findMany({
-    where: whereClause,
-    include: {
-      customer: {
-        select: {
-          documentNumber: true,
-          firstName: true,
-          lastName: true,
-          monthlyIncome: true,
+    const credits = await prisma.creditRequest.findMany({
+      where: whereClause,
+      include: {
+        customer: {
+          select: {
+            documentNumber: true,
+            firstName: true,
+            lastName: true,
+            monthlyIncome: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
-  return credits;
-}
+    return credits;
+  }
+  //HU-11
+  static simulateAmortization(data: SimulateCreditDTO): AmortizationSimulationResponse {
+    const { amount, termMonths } = data;
+
+    if (amount === undefined || isNaN(amount) || amount <= 0) {
+      throw new AppError('El monto del crédito (amount) debe ser un número válido mayor a 0', 400);
+    }
+
+    if (termMonths === undefined || isNaN(termMonths) || !Number.isInteger(termMonths) || termMonths < 1 || termMonths > 72) {
+      throw new AppError('El plazo en meses (termMonths) debe ser un número entero entre 1 y 72', 400);
+    }
+
+    return FinancialService.generateAmortizationSchedule(amount, termMonths);
+  }
 }

@@ -34,23 +34,54 @@ export class CreditController {
     }
   }
   static async getCredits(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { status, documentNumber } = req.query;
+    try {
+      const { status, documentNumber } = req.query;
 
-    const filters = {
-      status: status ? String(status) : undefined,
-      documentNumber: documentNumber ? String(documentNumber) : undefined,
-    };
+      const filters = {
+        status: status ? String(status) : undefined,
+        documentNumber: documentNumber ? String(documentNumber) : undefined,
+      };
 
-    const credits = await CreditService.getCredits(filters);
+      const credits = await CreditService.getCredits(filters);
 
-    return res.status(200).json({
-      message: 'Listado de solicitudes de crédito obtenido exitosamente',
-      count: credits.length,
-      data: credits,
-    });
-  } catch (error) {
-    next(error);
+      return res.status(200).json({
+        message: 'Listado de solicitudes de crédito obtenido exitosamente',
+        count: credits.length,
+        data: credits,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-}
+  static simulate(req: Request, res: Response, next: NextFunction) {
+    try {
+      // 1. Validar que req.body sea un objeto no nulo
+      if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+        throw new AppError('El cuerpo de la petición debe ser un objeto JSON válido con los campos amount y termMonths', 400);
+      }
+
+      const { amount, termMonths } = req.body;
+
+      // 2. Validar presencia de parámetros obligatorios
+      if (amount === undefined || termMonths === undefined) {
+        throw new AppError('Los campos amount y termMonths son obligatorios', 400);
+      }
+
+      const parsedAmount = Number(amount);
+      const parsedTermMonths = Number(termMonths);
+
+      // 3. Delegar al servicio
+      const simulation = CreditService.simulateAmortization({
+        amount: parsedAmount,
+        termMonths: parsedTermMonths,
+      });
+
+      return res.status(200).json({
+        message: 'Simulación del plan de amortización realizada exitosamente',
+        data: simulation,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

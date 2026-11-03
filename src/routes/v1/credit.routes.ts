@@ -4,6 +4,8 @@ import { verifyToken, requireRoles } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
+// HU-11: Simulación de amortización (PÚBLICO)
+router.post('/simulate', CreditController.simulate);
 router.use(verifyToken);
 
 // HU-08: Permitido exclusivamente para ADMIN y ADVISOR
@@ -12,5 +14,6 @@ router.post('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.create);
 router.patch('/:id/evaluate', requireRoles(['ADMIN']), CreditController.evaluate);
 // HU-10: Listado y filtrado de solicitudes para ADMIN y ADVISOR
 router.get('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.getCredits);
+router.post('/simulate', CreditController.simulate);
 
 export default router;
