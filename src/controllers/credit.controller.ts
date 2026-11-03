@@ -84,7 +84,22 @@ export class CreditController {
       next(error);
     }
   }
-  // Dentro de la clase CreditController:
+  // HU-12: Liquidación / Desembolso
+  static async disburse(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+
+      const disbursedCredit = await CreditService.disburseCredit(id);
+
+      return res.status(200).json({
+        message: 'Crédito liquidado y desembolsado exitosamente. Se ha generado el cronograma oficial de pagos.',
+        data: disbursedCredit,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);
@@ -99,4 +114,5 @@ export class CreditController {
       next(error);
     }
   }
+
 }

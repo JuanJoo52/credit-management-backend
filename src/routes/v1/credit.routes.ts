@@ -14,7 +14,9 @@ router.post('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.create);
 router.patch('/:id/evaluate', requireRoles(['ADMIN']), CreditController.evaluate);
 // HU-10: Listado y filtrado de solicitudes para ADMIN y ADVISOR
 router.get('/', requireRoles(['ADMIN', 'ADVISOR']), CreditController.getCredits);
-// HU-12: Detalle de solicitud por ID (ADMIN, ADVISOR)
+// HU-12: Liquidar/Desembolsar crédito (Exclusivo ADMIN)
+router.post('/:id/disburse', requireRoles(['ADMIN']), CreditController.disburse);
+// HU-14: Detalle de solicitud por ID (ADMIN, ADVISOR)
 router.get('/:id', requireRoles(['ADMIN', 'ADVISOR']), CreditController.getById);
 
 export default router;

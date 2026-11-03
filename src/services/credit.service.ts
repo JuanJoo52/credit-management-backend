@@ -2,6 +2,7 @@ import { PrismaClient, CreditStatus } from '@prisma/client';
 import { AppError } from '../errors/app.error';
 import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO, SimulateCreditDTO, AmortizationSimulationResponse } from '../types/credit.types';
 import { FinancialService } from './financial.service';
+import { InstallmentStatus } from '@prisma/client';
 
 
 const prisma = new PrismaClient();
@@ -198,7 +199,84 @@ export class CreditService {
 
     return FinancialService.generateAmortizationSchedule(amount, termMonths);
   }
-  // HU-12
+  // HU-12: Liquidación y Desembolso Oficial de Crédito (Exclusivo ADMIN)
+  static async disburseCredit(id: number) {
+    if (isNaN(id) || id <= 0) {
+      throw new AppError('El ID de la solicitud debe ser un número entero válido mayor a 0', 400);
+    }
+
+    // 1. Buscar la solicitud existente
+    const creditRequest = await prisma.creditRequest.findUnique({
+      where: { id },
+    });
+
+    if (!creditRequest) {
+      throw new AppError(`No se encontró ninguna solicitud de crédito con el ID ${id}`, 404);
+    }
+
+    // 2. Validar que esté estrictamente APROBADA
+    if (creditRequest.status !== CreditStatus.APPROVED) {
+      throw new AppError(
+        `No se puede liquidar la solicitud. Su estado actual es '${creditRequest.status}', pero debe ser estrictamente 'APPROVED'`,
+        400
+      );
+    }
+
+    // 3. Generar la tabla de amortización (Sistema Francés)
+    const simulation = FinancialService.generateAmortizationSchedule(
+      creditRequest.amount,
+      creditRequest.termMonths
+    );
+
+    // 4. Transacción atómica en Prisma
+    const result = await prisma.$transaction(async (tx) => {
+      const today = new Date();
+
+      // Mapeo haciendo MATCH EXACTO con las columnas de tu modelo Installment
+      const installmentsData = simulation.schedule.map((item) => {
+        const dueDate = new Date(today);
+        dueDate.setMonth(dueDate.getMonth() + item.installmentNumber);
+
+        return {
+          creditRequestId: creditRequest.id,
+          installmentNumber: item.installmentNumber,
+          dueDate,
+          principal: item.principal,
+          interest: item.interest,
+          totalAmount: item.payment,
+          status: InstallmentStatus.PENDING,
+        };
+      });
+
+      // Inserción masiva de cuotas
+      await tx.installment.createMany({
+        data: installmentsData,
+      });
+
+      // Actualización del estado a DISBURSED
+      const updatedCredit = await tx.creditRequest.update({
+        where: { id: creditRequest.id },
+        data: { status: CreditStatus.DISBURSED },
+        include: {
+          customer: {
+            select: {
+              documentNumber: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          installments: {
+            orderBy: { installmentNumber: 'asc' },
+          },
+        },
+      });
+
+      return updatedCredit;
+    });
+
+    return result;
+  }
+  // HU-14
   static async getCreditById(id: number) {
     if (isNaN(id) || id <= 0) {
       throw new AppError('El ID de la solicitud debe ser un número entero válido mayor a 0', 400);
