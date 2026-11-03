@@ -1,3 +1,4 @@
+import { DocumentType } from '@prisma/client';
 export interface CreateCreditRequestDTO {
   documentNumber: string;
   amount: number;
@@ -36,4 +37,16 @@ export interface AmortizationSimulationResponse {
   totalInterest: number;
   totalPayment: number;
   schedule: AmortizationScheduleItem[];
+}
+export interface CreatePublicCreditDTO {
+  documentType?: DocumentType;
+  documentNumber: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address?: string;
+  monthlyIncome: number;
+  amount: number;
+  termMonths: number;
+  destination?: string; 
 }

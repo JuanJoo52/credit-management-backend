@@ -99,7 +99,24 @@ export class CreditController {
       next(error);
     }
   }
+  // HU-13: Registro Público de Solicitud
+  static async createPublic(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+        throw new AppError('El cuerpo de la petición debe ser un objeto JSON válido', 400);
+      }
 
+      const creditRequest = await CreditService.createPublicCredit(req.body);
+
+      return res.status(201).json({
+        message: 'Solicitud de crédito registrada exitosamente. Ha quedado en estado PENDIENTE de evaluación.',
+        data: creditRequest,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+ //HU-14
   static async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);

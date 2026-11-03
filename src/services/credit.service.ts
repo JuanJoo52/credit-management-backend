@@ -1,8 +1,9 @@
 import { PrismaClient, CreditStatus } from '@prisma/client';
 import { AppError } from '../errors/app.error';
-import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO, SimulateCreditDTO, AmortizationSimulationResponse } from '../types/credit.types';
+import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO, SimulateCreditDTO, AmortizationSimulationResponse, CreatePublicCreditDTO } from '../types/credit.types';
 import { FinancialService } from './financial.service';
-import { InstallmentStatus } from '@prisma/client';
+import { InstallmentStatus, DocumentType } from '@prisma/client';
+
 
 
 const prisma = new PrismaClient();
@@ -275,6 +276,90 @@ export class CreditService {
     });
 
     return result;
+  }
+  // HU-13: Creación de Solicitud Pública (Cliente Prospecto)
+  static async createPublicCredit(data: CreatePublicCreditDTO) {
+    const {
+      documentType,
+      documentNumber,
+      firstName,
+      lastName,
+      phone,
+      address,
+      monthlyIncome,
+      amount,
+      termMonths,
+      destination,
+    } = data;
+
+    // 1. Validaciones básicas
+    if (!documentNumber || !documentNumber.trim()) {
+      throw new AppError('El número de documento es obligatorio', 400);
+    }
+    if (!firstName || !firstName.trim() || !lastName || !lastName.trim()) {
+      throw new AppError('El nombre y apellido son obligatorios', 400);
+    }
+    if (!monthlyIncome || isNaN(monthlyIncome) || monthlyIncome <= 0) {
+      throw new AppError('El ingreso mensual debe ser un número válido mayor a 0', 400);
+    }
+    if (!amount || isNaN(amount) || amount < 100000 || amount > 100000000) {
+      throw new AppError('El monto del crédito debe estar entre $100,000 y $100,000,000', 400);
+    }
+    if (!termMonths || isNaN(termMonths) || termMonths < 1 || termMonths > 72) {
+      throw new AppError('El plazo en meses debe estar entre 1 y 72 meses', 400);
+    }
+
+    // 2. Buscar o crear cliente respetando el tipo DocumentType
+    let customer = await prisma.customer.findUnique({
+      where: { documentNumber: documentNumber.trim() },
+    });
+
+    if (!customer) {
+      customer = await prisma.customer.create({
+        data: {
+          documentType: documentType || DocumentType.CC,
+          documentNumber: documentNumber.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          monthlyIncome: Number(monthlyIncome),
+          address: address ? address.trim() : 'No registrada',
+          phone: phone ? phone.trim() : '',
+        },
+      });
+    } else {
+      customer = await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          monthlyIncome: Number(monthlyIncome),
+          phone: phone ? phone.trim() : customer.phone,
+        },
+      });
+    }
+
+    // 3. Crear solicitud incluyendo el campo OBLIGATORIO destination
+    const creditRequest = await prisma.creditRequest.create({
+      data: {
+        customerId: customer.id,
+        amount: Number(amount),
+        termMonths: Number(termMonths),
+        destination: destination ? destination.trim() : 'Libre inversión',
+        status: CreditStatus.PENDING,
+      },
+      include: {
+        customer: {
+          select: {
+            documentType: true,
+            documentNumber: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            monthlyIncome: true,
+          },
+        },
+      },
+    });
+
+    return creditRequest;
   }
   // HU-14
   static async getCreditById(id: number) {

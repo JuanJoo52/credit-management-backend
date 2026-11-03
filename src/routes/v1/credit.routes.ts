@@ -6,6 +6,8 @@ const router = Router();
 
 // HU-11: Simulación de amortización (PÚBLICO)
 router.post('/simulate', CreditController.simulate);
+// HU-13: Formulario Público de Solicitud de Crédito
+router.post('/public', CreditController.createPublic);
 router.use(verifyToken);
 
 // HU-08: Permitido exclusivamente para ADMIN y ADVISOR
