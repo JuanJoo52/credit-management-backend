@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { createUserService, updateUserService } from '../services/user.service';
+import { createUserService, updateUserService, getAllUsersService} from '../services/user.service';
 
 
 export const createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const newUser = await createUserService(req.body);
-    
+
     res.status(201).json({
       success: true,
       message: 'User created successfully',
@@ -14,7 +14,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
     });
   } catch (error: any) {
     next(error);
-    
+
   }
 };
 
@@ -55,4 +55,15 @@ export const updateUserController = async (
     next(error);
   }
 };
-  
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await getAllUsersService();
+
+    return res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

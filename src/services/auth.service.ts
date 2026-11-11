@@ -2,20 +2,23 @@ import { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/app.error';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { LoginDto, AuthResponse } from '../types/auth.types';
 
 const prisma = new PrismaClient();
 
 export const loginService = async (credentials: any) => {
   const { email, password } = credentials;
-
-  // 1. Buscamos al usuario por el correo
+  if (!email || typeof email !== 'string') {
+    throw new AppError('Credenciales inválidas', 401);
+  }
+  // 1. Buscamos al usuario por el correo (normalizado a minúsculas)
+  const emailNormalizado = email.toLowerCase().trim();
   const user = await prisma.user.findUnique({
-    where: { email }
+    where: { email: emailNormalizado }
   });
-
   // Nunca le decimos al cliente "El correo no existe" o "La clave es incorrecta"  si no Credenciales inválidas" 
   if (!user) {
-    throw new AppError('Credenciales inválidas',401);
+    throw new AppError('Credenciales inválidas', 401);
   }
 
   //  Comparamos la contraseña en texto plano contra el hash de la base de datos
