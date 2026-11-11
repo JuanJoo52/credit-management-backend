@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createUser, updateUserController } from '../../controllers/user.controller';
+import { createUser, updateUserController, getUsers } from '../../controllers/user.controller';
 import { verifyToken, requireRoles } from '../../middlewares/auth.middleware';
 const router = Router();
 
@@ -17,5 +17,8 @@ router.patch(
   requireRoles(['ADMIN']),
   updateUserController
 );
+router.get('/',verifyToken,
+  requireRoles(['ADMIN']),
+ getUsers);
 export default router;
 
