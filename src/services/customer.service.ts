@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/app.error';
 import { CreateCustomerDTO, UpdateCustomerDTO } from '../types/customer.types';
+import { validateDocumentNumber } from '../utils/document.validator';
 
 const prisma = new PrismaClient();
 
@@ -17,13 +18,9 @@ export class CustomerService {
         if (typeof monthlyIncome !== 'number' || monthlyIncome <= 0) {
             throw new AppError('Los ingresos mensuales declarados deben ser un valor positivo mayor a cero', 400);
         }
-
-        // Validaciones de formato numérico
-        if (!/^\d+$/.test(documentNumber)) {
-            throw new AppError('El número de documento debe contener solo dígitos numéricos', 400);
-        }
-
-        if (!/^\d+$/.test(phone)) {
+        const cleanDocument = validateDocumentNumber(documentType, documentNumber);
+        const cleanPhone = phone.trim();
+        if (!/^\d{7,15}$/.test(cleanPhone)) {
             throw new AppError('El número de teléfono debe contener solo dígitos numéricos', 400);
         }
 
@@ -39,12 +36,12 @@ export class CustomerService {
         return await prisma.customer.create({
             data: {
                 documentType,
-                documentNumber,
-                firstName,
-                lastName,
+                documentNumber: cleanDocument,
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
                 monthlyIncome,
-                address,
-                phone,
+                address: address.trim(),
+                phone: cleanPhone,
             },
         });
     }

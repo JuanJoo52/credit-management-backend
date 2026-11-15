@@ -3,6 +3,7 @@ import { AppError } from '../errors/app.error';
 import { CreateCreditRequestDTO, EvaluateCreditRequestDTO, CreditFilterDTO, SimulateCreditDTO, AmortizationSimulationResponse, CreatePublicCreditDTO } from '../types/credit.types';
 import { FinancialService } from './financial.service';
 import { InstallmentStatus, DocumentType } from '@prisma/client';
+import { validateDocumentNumber } from '../utils/document.validator';
 
 
 
@@ -295,7 +296,12 @@ export class CreditService {
     // 1. Validaciones básicas
     if (!documentNumber || !documentNumber.trim()) {
       throw new AppError('El número de documento es obligatorio', 400);
+
     }
+    const docType = documentType || DocumentType.CC;
+
+    const cleanDocument = validateDocumentNumber(docType, documentNumber);
+
     if (!firstName || !firstName.trim() || !lastName || !lastName.trim()) {
       throw new AppError('El nombre y apellido son obligatorios', 400);
     }
@@ -309,16 +315,16 @@ export class CreditService {
       throw new AppError('El plazo en meses debe estar entre 1 y 72 meses', 400);
     }
 
-    // 2. Buscar o crear cliente respetando el tipo DocumentType
+    // 2. Buscar o crear cliente (Inmutable si ya existe en ruta pública)
     let customer = await prisma.customer.findUnique({
-      where: { documentNumber: documentNumber.trim() },
+      where: { documentNumber: cleanDocument },
     });
 
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
-          documentType: documentType || DocumentType.CC,
-          documentNumber: documentNumber.trim(),
+          documentType: docType,
+          documentNumber: cleanDocument,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           monthlyIncome: Number(monthlyIncome),
@@ -326,17 +332,9 @@ export class CreditService {
           phone: phone ? phone.trim() : '',
         },
       });
-    } else {
-      customer = await prisma.customer.update({
-        where: { id: customer.id },
-        data: {
-          monthlyIncome: Number(monthlyIncome),
-          phone: phone ? phone.trim() : customer.phone,
-        },
-      });
     }
 
-    // 3. Crear solicitud incluyendo el campo OBLIGATORIO destination
+    // 3. Crear solicitud asociada al cliente (existente o recién creado)
     const creditRequest = await prisma.creditRequest.create({
       data: {
         customerId: customer.id,
@@ -345,17 +343,10 @@ export class CreditService {
         destination: destination ? destination.trim() : 'Libre inversión',
         status: CreditStatus.PENDING,
       },
-      include: {
-        customer: {
-          select: {
-            documentType: true,
-            documentNumber: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            monthlyIncome: true,
-          },
-        },
+
+      select: {
+        id: true,
+        status: true,
       },
     });
 
