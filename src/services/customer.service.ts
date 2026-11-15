@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../errors/app.error';
 import { CreateCustomerDTO, UpdateCustomerDTO } from '../types/customer.types';
-import { validateDocumentNumber } from '../utils/document.validator';
+import { validateDocumentNumber, validateDocumentParam } from '../utils/document.validator';
+
 
 const prisma = new PrismaClient();
 
@@ -49,12 +50,10 @@ export class CustomerService {
     // HU-06: Buscar Cliente por Número de Documento
     static async getCustomerByDocument(documentNumber: string) {
         // Validación de formato numérico previo a la consulta en BD
-        if (!documentNumber || !/^\d+$/.test(documentNumber)) {
-            throw new AppError('El número de documento ingresado debe tener un formato numérico válido', 400);
-        }
+        const cleanDocument = validateDocumentParam(documentNumber);
 
         const customer = await prisma.customer.findUnique({
-            where: { documentNumber },
+            where: { documentNumber:cleanDocument },
         });
 
         if (!customer) {
@@ -83,10 +82,8 @@ export class CustomerService {
     }
     // HU-07: Actualizar datos de contacto e ingresos del cliente
     static async updateCustomer(documentNumber: string, data: UpdateCustomerDTO, bodyPayload: any) {
-        // 1. Validar formato numérico del parámetro de ruta
-        if (!documentNumber || !/^\d+$/.test(documentNumber)) {
-            throw new AppError('El número de documento ingresado debe tener un formato numérico válido', 400);
-        }
+        // 1. Validar y normalizar documento acepta cc pasaporte y ce
+        const cleanDocument = validateDocumentParam(documentNumber);
 
         // 2. Regla defensiva: Inmutabilidad del número y tipo de documento
         if (bodyPayload.documentNumber !== undefined || bodyPayload.documentType !== undefined) {
@@ -100,7 +97,7 @@ export class CustomerService {
 
         // 4. Verificar existencia previa en base de datos
         const existingCustomer = await prisma.customer.findUnique({
-            where: { documentNumber },
+            where: { documentNumber: cleanDocument },
         });
 
         if (!existingCustomer) {
@@ -115,16 +112,20 @@ export class CustomerService {
         }
 
         // 6. Validar formato del teléfono si se incluye en el body
-        if (data.phone !== undefined && !/^\d+$/.test(data.phone)) {
-            throw new AppError('El número de teléfono debe contener solo dígitos numéricos', 400);
+        if (data.phone !== undefined) {
+            const cleanPhone = data.phone.trim();
+            if (!/^\d{7,15}$/.test(cleanPhone)) {
+                throw new AppError('El número de teléfono debe contener solo dígitos numéricos', 400);
+            }
+            data.phone = cleanPhone;
         }
 
         // 7. Actualización parcial en PostgreSQL vía Prisma
         return await prisma.customer.update({
-            where: { documentNumber },
+            where: { documentNumber: cleanDocument },
             data: {
                 ...(data.monthlyIncome !== undefined && { monthlyIncome: data.monthlyIncome }),
-                ...(data.address !== undefined && { address: data.address }),
+                ...(data.address !== undefined && { address: data.address.trim() }),
                 ...(data.phone !== undefined && { phone: data.phone }),
             },
         });
