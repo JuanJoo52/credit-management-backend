@@ -92,7 +92,7 @@ export const forgotPasswordService = async (email: string) => {
     { expiresIn: '15m' }
   );
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = process.env.CORS_ORIGINS || 'http://localhost:5173';
   const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
   // await obligatorio para garantizar el envío en Vercel Serverless
