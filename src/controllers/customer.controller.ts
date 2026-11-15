@@ -38,4 +38,15 @@ export class CustomerController {
             next(error);
         }
     }
+    //GET ALL COSTUMERS
+   static async getAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customers = await CustomerService.getAllCustomers();
+      return res.status(200).json({
+        data: customers,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

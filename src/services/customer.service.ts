@@ -63,6 +63,24 @@ export class CustomerService {
 
         return customer;
     }
+    //FEAT: GET ALL CUSTOMERS
+    static async getAllCustomers() {
+        return await prisma.customer.findMany({
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                documentType: true,
+                documentNumber: true,
+                firstName: true,
+                lastName: true,
+                monthlyIncome: true,
+                address: true,
+                phone: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+    }
     // HU-07: Actualizar datos de contacto e ingresos del cliente
     static async updateCustomer(documentNumber: string, data: UpdateCustomerDTO, bodyPayload: any) {
         // 1. Validar formato numérico del parámetro de ruta

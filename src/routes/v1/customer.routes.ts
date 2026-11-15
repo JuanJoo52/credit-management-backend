@@ -5,10 +5,10 @@ import { verifyToken, requireRoles } from '../../middlewares/auth.middleware';
 const router = Router();
 
 router.use(verifyToken);
-router.use(requireRoles(['ADMIN', 'ADVISOR']));
 
 router.post('/', CustomerController.create);
-router.get('/by-document/:documentNumber', CustomerController.getByDocument);
-router.patch('/by-document/:documentNumber', CustomerController.updateByDocument);
+router.get('/by-document/:documentNumber',requireRoles(['ADMIN', 'ADVISOR']), CustomerController.getByDocument);
+router.patch('/by-document/:documentNumber',requireRoles(['ADMIN', 'ADVISOR']), CustomerController.updateByDocument);
+router.get('/',requireRoles(['ADMIN', 'ADVISOR','CASHIER']),CustomerController.getAll);
 
 export default router;
