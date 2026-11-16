@@ -3,6 +3,7 @@ import userRoutes from './user.routes';
 import authRoutes from './auth.routes'; 
 import customerRoutes from './customer.routes';
 import creditRoutes from './credit.routes';
+import collectionRoutes from './collection.routes';
 
 const router = Router();
 
@@ -14,5 +15,5 @@ router.use('/users', userRoutes);
 router.use('/auth', authRoutes); 
 router.use('/customers', customerRoutes);
 router.use('/credits', creditRoutes);
-
+router.use('/collections', collectionRoutes);
 export default router;
