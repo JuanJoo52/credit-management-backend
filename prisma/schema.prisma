@@ -1,11 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider        = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -28,9 +27,11 @@ model User {
   role         Role
   status       UserStatus @default(ACTIVE)
   createdAt    DateTime   @default(now()) @map("created_at")
+  payments     Payment[]
 
   @@map("users")
 }
+
 enum DocumentType {
   CC
   CE
@@ -38,20 +39,21 @@ enum DocumentType {
 }
 
 model Customer {
-  id             Int          @id @default(autoincrement())
+  id             Int             @id @default(autoincrement())
   documentType   DocumentType
-  documentNumber String       @unique
+  documentNumber String          @unique
   firstName      String
   lastName       String
   monthlyIncome  Float
   address        String
   phone          String
   creditRequests CreditRequest[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@map("customers")
 }
+
 enum CreditStatus {
   PENDING
   APPROVED
@@ -61,25 +63,26 @@ enum CreditStatus {
 
 enum InstallmentStatus {
   PENDING
+  PARTIAL
   PAID
   OVERDUE
 }
 
 model CreditRequest {
-  id              Int           @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   amount          Float
   termMonths      Int
   destination     String
-  status          CreditStatus  @default(PENDING)
+  status          CreditStatus @default(PENDING)
   rejectionReason String?
-  
-  customerId      Int
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  
-  installments    Installment[]
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  installments Installment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("credit_requests")
 }
@@ -90,14 +93,30 @@ model Installment {
   dueDate           DateTime
   principal         Float
   interest          Float
+  paidAmount        Float             @default(0)
   totalAmount       Float
   status            InstallmentStatus @default(PENDING)
 
-  creditRequestId   Int
-  creditRequest     CreditRequest     @relation(fields: [creditRequestId], references: [id])
+  creditRequestId Int
+  creditRequest   CreditRequest @relation(fields: [creditRequestId], references: [id])
+  payments        Payment[]
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("installments")
+}
+
+model Payment {
+  id     Int      @id @default(autoincrement())
+  amount Float
+  paidAt DateTime @default(now())
+
+  installmentId Int
+  installment   Installment @relation(fields: [installmentId], references: [id])
+
+  cashierId Int
+  cashier   User @relation(fields: [cashierId], references: [id])
+
+  @@map("payments")
 }
