@@ -18,10 +18,10 @@ export class CreditService {
     if (!documentNumber || amount === undefined || termMonths === undefined || !destination) {
       throw new AppError('Todos los campos son obligatorios: documentNumber, amount, termMonths y destination', 400);
     }
+    const normalizedDocument = String(documentNumber).trim().toUpperCase();
 
-    // Validar que el documento sea numérico
-    if (!/^\d+$/.test(documentNumber)) {
-      throw new AppError('El número de documento debe tener un formato numérico válido', 400);
+    if (!/^[A-Z0-9]{5,20}$/.test(normalizedDocument)) {
+      throw new AppError('El número de documento debe ser alfanumérico válido (entre 5 y 20 caracteres)', 400);
     }
 
     // Validar valores numéricos positivos
@@ -44,7 +44,7 @@ export class CreditService {
 
     //  Verificar que el cliente existe en la base de datos
     const customer = await prisma.customer.findUnique({
-      where: { documentNumber },
+      where: { documentNumber: normalizedDocument },
     });
 
     if (!customer) {
