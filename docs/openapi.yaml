@@ -1,0 +1,2432 @@
+openapi: 3.0.3
+info:
+  title: Credit Management API
+  version: 1.0.0
+  description: API REST del Sistema de Gestion de Creditos. Base /api/v1. Incluye autenticacion JWT, administracion de personal y clientes, solicitudes, simulacion, evaluacion, desembolso y recaudo. Los ejemplos utilizan datos de demostracion. x-roles indica los roles autorizados; una lista vacia corresponde a una ruta publica.
+servers:
+  - url: https://credit-management-backend.vercel.app/api/v1
+    description: "Produccion: Vercel y PostgreSQL en Supabase"
+  - url: http://localhost:3000/api/v1
+    description: Desarrollo local
+tags:
+  - name: Sistema
+  - name: Autenticación
+  - name: Usuarios
+  - name: Clientes
+  - name: Créditos
+  - name: Recaudo
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Estado de API
+      tags:
+        - Sistema
+      description: No consulta la base de datos.
+      security: []
+      x-roles: []
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                required:
+                  - status
+              example:
+                status: "API v1 is running "
+  /auth/login:
+    post:
+      operationId: login
+      summary: Iniciar sesión
+      tags:
+        - Autenticación
+      description: JWT de 2 horas con userId y role. Todos los errores capturados por este controlador se convierten en 401.
+      security: []
+      x-roles: []
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: "#/components/schemas/User"
+                    required:
+                      - token
+                      - user
+                required:
+                  - success
+                  - message
+                  - data
+              example:
+                success: true
+                message: Login exitoso
+                data:
+                  token: <JWT>
+                  user:
+                    id: 1
+                    name: Ana Administradora
+                    email: admin@example.com
+                    role: ADMIN
+                    status: ACTIVE
+                    createdAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+              required:
+                - email
+                - password
+            example:
+              email: admin@example.com
+              password: DemoPass123
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: Solicitar recuperación
+      tags:
+        - Autenticación
+      description: Respuesta genérica para correo inexistente o inactivo; JWT de recuperación de 15 minutos. SMTP solo en NODE_ENV=production.
+      security: []
+      x-roles: []
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                required:
+                  - success
+                  - message
+              example:
+                success: true
+                message: Si el correo se encuentra registrado, recibirás un enlace para restablecer tu contraseña.
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+              required:
+                - email
+            example:
+              email: admin@example.com
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      summary: Restablecer contraseña
+      tags:
+        - Autenticación
+      description: "Secreto dinámico JWT_SECRET + passwordHash: cambiar la contraseña invalida el enlace. La regla aquí es longitud mínima 8, distinta de alta de usuarios."
+      security: []
+      x-roles: []
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                required:
+                  - success
+                  - message
+              example:
+                success: true
+                message: Contraseña restablecida exitosamente. Ya puedes iniciar sesión.
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+              required:
+                - token
+                - newPassword
+            example:
+              token: <RESET_JWT>
+              newPassword: NuevaPass123
+  /users:
+    post:
+      operationId: createUser
+      summary: Crear empleado
+      tags:
+        - Usuarios
+      description: Crear empleado
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+      responses:
+        "201":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/User"
+                required:
+                  - success
+                  - message
+                  - data
+              example:
+                success: true
+                message: User created successfully
+                data:
+                  id: 2
+                  name: Carlos Cajero
+                  email: cashier@example.com
+                  role: CASHIER
+                  status: ACTIVE
+                  createdAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "409":
+          description: Correo o documento ya registrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Correo o documento ya registrado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+            example:
+              name: Carlos Cajero
+              email: cashier@example.com
+              password: DemoPass123
+              role: CASHIER
+    get:
+      operationId: listUsers
+      summary: Listar empleados
+      tags:
+        - Usuarios
+      description: Orden descendente por createdAt; sin paginación.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                required:
+                  - success
+                  - data
+              example:
+                success: true
+                data:
+                  - id: 1
+                    name: Ana Administradora
+                    email: admin@example.com
+                    role: ADMIN
+                    status: ACTIVE
+                    createdAt: 2026-11-19T15:00:00.000Z
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      summary: Actualizar empleado
+      tags:
+        - Usuarios
+      description: Impide la autodesactivación; permite cambiar name, role, status.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/User"
+                required:
+                  - success
+                  - message
+                  - data
+              example:
+                success: true
+                message: Empleado actualizado exitosamente
+                data:
+                  id: 2
+                  name: Carlos Cajero
+                  email: admin@example.com
+                  role: CASHIER
+                  status: INACTIVE
+                  createdAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+            example:
+              name: Carlos Cajero
+              status: INACTIVE
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+  /customers:
+    post:
+      operationId: createCustomer
+      summary: Registrar cliente
+      tags:
+        - Clientes
+      description: "Solo verifyToken: no hay restricción RBAC adicional. CC/CE: 6–10 dígitos; PASSPORT: 6–12 alfanuméricos. Teléfono: 7–15 dígitos."
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+        - CASHIER
+      responses:
+        "201":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Customer"
+                required:
+                  - message
+                  - data
+              example:
+                message: Cliente registrado exitosamente
+                data:
+                  id: 1
+                  documentType: CC
+                  documentNumber: "1234567890"
+                  firstName: Laura
+                  lastName: Pérez
+                  monthlyIncome: 3000000
+                  address: "Calle 10 # 20-30"
+                  phone: "3001234567"
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "409":
+          description: Correo o documento ya registrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Correo o documento ya registrado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerCreate"
+            example:
+              documentType: CC
+              documentNumber: "1234567890"
+              firstName: Laura
+              lastName: Pérez
+              monthlyIncome: 3000000
+              address: "Calle 10 # 20-30"
+              phone: "3001234567"
+    get:
+      operationId: listCustomers
+      summary: Listar clientes
+      tags:
+        - Clientes
+      description: Orden descendente por createdAt; sin paginación.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+        - CASHIER
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Customer"
+                required:
+                  - data
+              example:
+                data:
+                  - id: 1
+                    documentType: CC
+                    documentNumber: "1234567890"
+                    firstName: Laura
+                    lastName: Pérez
+                    monthlyIncome: 3000000
+                    address: "Calle 10 # 20-30"
+                    phone: "3001234567"
+                    createdAt: 2026-11-19T15:00:00.000Z
+                    updatedAt: 2026-11-19T15:00:00.000Z
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+  /customers/by-document/{documentNumber}:
+    get:
+      operationId: getCustomer
+      summary: Consultar cliente
+      tags:
+        - Clientes
+      description: Consultar cliente
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Customer"
+                required:
+                  - data
+              example:
+                data:
+                  id: 1
+                  documentType: CC
+                  documentNumber: "1234567890"
+                  firstName: Laura
+                  lastName: Pérez
+                  monthlyIncome: 3000000
+                  address: "Calle 10 # 20-30"
+                  phone: "3001234567"
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      parameters:
+        - name: documentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "1234567890"
+    patch:
+      operationId: updateCustomer
+      summary: Actualizar cliente
+      tags:
+        - Clientes
+      description: Actualizar cliente
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Customer"
+                required:
+                  - message
+                  - data
+              example:
+                message: Datos del cliente actualizados exitosamente
+                data:
+                  id: 1
+                  documentType: CC
+                  documentNumber: "1234567890"
+                  firstName: Laura
+                  lastName: Pérez
+                  monthlyIncome: 3500000
+                  address: "Calle 10 # 20-30"
+                  phone: "3007654321"
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerUpdate"
+            example:
+              phone: "3007654321"
+              monthlyIncome: 3500000
+      parameters:
+        - name: documentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "1234567890"
+  /credits/simulate:
+    post:
+      operationId: simulateCredit
+      summary: Simular amortización
+      tags:
+        - Créditos
+      description: Sistema francés, tasa mensual fija 1.5%. Convierte amount y termMonths con Number; no impone el máximo de monto de creación.
+      security: []
+      x-roles: []
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Simulation"
+                required:
+                  - message
+                  - data
+              example:
+                message: Simulación del plan de amortización realizada exitosamente
+                data:
+                  amount: 100000
+                  termMonths: 1
+                  monthlyInterestRate: 0.015
+                  monthlyInstallment: 101500
+                  totalInterest: 1500
+                  totalPayment: 101500
+                  schedule:
+                    - installmentNumber: 1
+                      payment: 101500
+                      interest: 1500
+                      principal: 100000
+                      remainingBalance: 0
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulationInput"
+            example:
+              amount: 100000
+              termMonths: 1
+  /credits/public:
+    post:
+      operationId: createPublicCredit
+      summary: Solicitar crédito público
+      tags:
+        - Créditos
+      description: Crea cliente si no existe; si existe no modifica sus datos. documentType=CC, address=No registrada, phone vacío y destination=Libre inversión por defecto. Cliente y solicitud se crean sin transacción conjunta.
+      security: []
+      x-roles: []
+      responses:
+        "201":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - DISBURSED
+                    required:
+                      - id
+                      - status
+                required:
+                  - message
+                  - data
+              example:
+                message: Solicitud de crédito registrada exitosamente. Ha quedado en estado PENDIENTE de evaluación.
+                data:
+                  id: 1
+                  status: PENDING
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicCredit"
+            example:
+              documentType: CC
+              documentNumber: "1234567890"
+              firstName: Laura
+              lastName: Pérez
+              monthlyIncome: 3000000
+              address: "Calle 10 # 20-30"
+              phone: "3001234567"
+              amount: 100000
+              termMonths: 1
+              destination: Capital de trabajo
+  /credits:
+    post:
+      operationId: createCredit
+      summary: Crear solicitud interna
+      tags:
+        - Créditos
+      description: Documento alfanumérico de 5–20 caracteres; cliente debe existir. Monto positivo hasta 100000000, plazo entero de 1–72.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+      responses:
+        "201":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CreditCreated"
+                required:
+                  - message
+                  - data
+              example:
+                message: Solicitud de crédito creada exitosamente en estado Pendiente
+                data:
+                  id: 1
+                  amount: 100000
+                  termMonths: 1
+                  destination: Capital de trabajo
+                  status: PENDING
+                  rejectionReason: null
+                  customerId: 1
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+                  customer:
+                    documentNumber: "1234567890"
+                    firstName: Laura
+                    lastName: Pérez
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditCreate"
+            example:
+              documentNumber: "1234567890"
+              amount: 100000
+              termMonths: 1
+              destination: Capital de trabajo
+    get:
+      operationId: listCredits
+      summary: Listar solicitudes
+      tags:
+        - Créditos
+      description: Filtros opcionales status y documentNumber; status se convierte a mayúsculas, documento solo trim. Orden descendente por createdAt.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CreditEvaluated"
+                required:
+                  - message
+                  - count
+                  - data
+              example:
+                message: Listado de solicitudes de crédito obtenido exitosamente
+                count: 1
+                data:
+                  - id: 1
+                    amount: 100000
+                    termMonths: 1
+                    destination: Capital de trabajo
+                    status: PENDING
+                    rejectionReason: null
+                    customerId: 1
+                    createdAt: 2026-11-19T15:00:00.000Z
+                    updatedAt: 2026-11-19T15:00:00.000Z
+                    customer:
+                      documentNumber: "1234567890"
+                      firstName: Laura
+                      lastName: Pérez
+                      monthlyIncome: 3000000
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - APPROVED
+              - REJECTED
+              - DISBURSED
+          description: También admite minúsculas.
+        - name: documentNumber
+          in: query
+          schema:
+            type: string
+          example: "1234567890"
+  /credits/{id}/evaluate:
+    patch:
+      operationId: evaluateCredit
+      summary: Evaluar solicitud
+      tags:
+        - Créditos
+      description: Solo PENDING; rechazo exige rejectionReason no vacío; aprobación exige cuota francesa <= 40% de monthlyIncome.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CreditEvaluated"
+                required:
+                  - message
+                  - data
+              example:
+                message: "Solicitud de crédito evaluada exitosamente: APPROVED"
+                data:
+                  id: 1
+                  amount: 100000
+                  termMonths: 1
+                  destination: Capital de trabajo
+                  status: APPROVED
+                  rejectionReason: null
+                  customerId: 1
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+                  customer:
+                    documentNumber: "1234567890"
+                    firstName: Laura
+                    lastName: Pérez
+                    monthlyIncome: 3000000
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditEvaluate"
+            example:
+              status: APPROVED
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+  /credits/{id}/disburse:
+    post:
+      operationId: disburseCredit
+      summary: Desembolsar crédito
+      tags:
+        - Créditos
+      description: Solo APPROVED; transacción crea cuotas y cambia estado a DISBURSED. Fechas calculadas con Date.setMonth desde el día del desembolso. No ejecuta transferencia bancaria.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CreditDisbursed"
+                required:
+                  - message
+                  - data
+              example:
+                message: Crédito liquidado y desembolsado exitosamente. Se ha generado el cronograma oficial de pagos.
+                data:
+                  id: 1
+                  amount: 100000
+                  termMonths: 1
+                  destination: Capital de trabajo
+                  status: DISBURSED
+                  rejectionReason: null
+                  customerId: 1
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+                  customer:
+                    documentNumber: "1234567890"
+                    firstName: Laura
+                    lastName: Pérez
+                  installments:
+                    - id: 1
+                      installmentNumber: 1
+                      dueDate: 2026-12-19T15:00:00.000Z
+                      principal: 100000
+                      interest: 1500
+                      paidAmount: 0
+                      totalAmount: 101500
+                      status: PENDING
+                      creditRequestId: 1
+                      createdAt: 2026-11-19T15:00:00.000Z
+                      updatedAt: 2026-11-19T15:00:00.000Z
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+  /credits/{id}:
+    get:
+      operationId: getCredit
+      summary: Detalle de solicitud
+      tags:
+        - Créditos
+      description: Detalle de solicitud
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CreditDetail"
+                required:
+                  - message
+                  - data
+              example:
+                message: Detalle de la solicitud de crédito obtenido exitosamente
+                data:
+                  id: 1
+                  amount: 100000
+                  termMonths: 1
+                  destination: Capital de trabajo
+                  status: PENDING
+                  rejectionReason: null
+                  customerId: 1
+                  createdAt: 2026-11-19T15:00:00.000Z
+                  updatedAt: 2026-11-19T15:00:00.000Z
+                  customer:
+                    id: 1
+                    documentNumber: "1234567890"
+                    firstName: Laura
+                    lastName: Pérez
+                    phone: "3001234567"
+                    monthlyIncome: 3000000
+                  installments: []
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+  /collections/customers/{documentNumber}/pending-installments:
+    get:
+      operationId: pendingInstallments
+      summary: "HU-16: consultar cuotas pendientes"
+      tags:
+        - Recaudo
+      description: Solo créditos DISBURSED y cuotas PENDING/PARTIAL/OVERDUE, ordenadas por dueDate dentro de cada crédito. Documento trim y mayúsculas, sin regex adicional.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - ADMIN
+        - ADVISOR
+        - CASHIER
+      responses:
+        "200":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Pending"
+                required:
+                  - success
+                  - message
+                  - data
+              example:
+                success: true
+                message: Cuotas pendientes consultadas exitosamente
+                data:
+                  customer:
+                    id: 1
+                    fullName: Laura Pérez
+                    documentNumber: "1234567890"
+                  activeCredits:
+                    - creditRequestId: 1
+                      amount: 100000
+                      pendingInstallments:
+                        - installmentId: 1
+                          installmentNumber: 1
+                          dueDate: 2026-12-19T15:00:00.000Z
+                          totalAmount: 101500
+                          paidAmount: 0
+                          pendingBalance: 101500
+                          status: Pendiente
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      parameters:
+        - name: documentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "1234567890"
+  /collections/payments:
+    post:
+      operationId: registerPayment
+      summary: "HU-17: registrar pago"
+      tags:
+        - Recaudo
+      description: Convierte installmentId y amount con Number. cashierId proviene del usuario autenticado, nunca del body. Pago por una cuota; monto <= saldo pendiente; saldo cero => PAID, de otro modo PARTIAL.
+      security:
+        - bearerAuth: []
+      x-roles:
+        - CASHIER
+      responses:
+        "201":
+          description: Respuesta exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/PaymentResult"
+                required:
+                  - success
+                  - message
+                  - data
+              example:
+                success: true
+                message: Pago registrado exitosamente
+                data:
+                  receipt:
+                    paymentId: 1
+                    paidAt: 2026-11-19T15:00:00.000Z
+                    amountPaid: 50000
+                    installmentId: 1
+                    installmentNumber: 1
+                    totalInstallmentAmount: 101500
+                    paidAmount: 50000
+                    remainingBalance: 51500
+                    status: Con abono
+        "400":
+          description: Validación o regla de negocio incumplida; JSON malformado.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/MalformedJson"
+              example:
+                success: false
+                message: Validación o regla de negocio incumplida; JSON malformado.
+        "401":
+          description: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Token ausente, inválido o expirado; usuario inexistente/inactivo; credenciales inválidas en login.
+        "403":
+          description: Rol actual sin autorización.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Rol actual sin autorización.
+        "404":
+          description: Recurso inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Recurso inexistente.
+        "500":
+          description: Error interno, persistencia o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                message: Error interno, persistencia o configuración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+            example:
+              installmentId: 1
+              amount: 50000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de login válido por 2 horas. Se verifica existencia, estado ACTIVE y rol actual en BD.
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+      required:
+        - success
+        - message
+    MalformedJson:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+      required:
+        - status
+        - message
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - ADVISOR
+            - CASHIER
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+        - createdAt
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        documentType:
+          type: string
+          enum:
+            - CC
+            - CE
+            - PASSPORT
+        documentNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        monthlyIncome:
+          type: number
+        address:
+          type: string
+        phone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - documentType
+        - documentNumber
+        - firstName
+        - lastName
+        - monthlyIncome
+        - address
+        - phone
+        - createdAt
+        - updatedAt
+    Installment:
+      type: object
+      properties:
+        id:
+          type: integer
+        installmentNumber:
+          type: integer
+        dueDate:
+          type: string
+          format: date-time
+        principal:
+          type: number
+        interest:
+          type: number
+        paidAmount:
+          type: number
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PARTIAL
+            - PAID
+            - OVERDUE
+        creditRequestId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - installmentNumber
+        - dueDate
+        - principal
+        - interest
+        - paidAmount
+        - totalAmount
+        - status
+        - creditRequestId
+        - createdAt
+        - updatedAt
+    CreditCreated:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        termMonths:
+          type: integer
+        destination:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - DISBURSED
+        rejectionReason:
+          type: string
+          nullable: true
+        customerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            documentNumber:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+          required:
+            - documentNumber
+            - firstName
+            - lastName
+      required:
+        - id
+        - amount
+        - termMonths
+        - destination
+        - status
+        - rejectionReason
+        - customerId
+        - createdAt
+        - updatedAt
+        - customer
+    CreditEvaluated:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        termMonths:
+          type: integer
+        destination:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - DISBURSED
+        rejectionReason:
+          type: string
+          nullable: true
+        customerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            documentNumber:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            monthlyIncome:
+              type: number
+          required:
+            - documentNumber
+            - firstName
+            - lastName
+            - monthlyIncome
+      required:
+        - id
+        - amount
+        - termMonths
+        - destination
+        - status
+        - rejectionReason
+        - customerId
+        - createdAt
+        - updatedAt
+        - customer
+    CreditDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        termMonths:
+          type: integer
+        destination:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - DISBURSED
+        rejectionReason:
+          type: string
+          nullable: true
+        customerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+            documentNumber:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            phone:
+              type: string
+            monthlyIncome:
+              type: number
+          required:
+            - id
+            - documentNumber
+            - firstName
+            - lastName
+            - phone
+            - monthlyIncome
+        installments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Installment"
+      required:
+        - id
+        - amount
+        - termMonths
+        - destination
+        - status
+        - rejectionReason
+        - customerId
+        - createdAt
+        - updatedAt
+        - customer
+        - installments
+    CreditDisbursed:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        termMonths:
+          type: integer
+        destination:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - DISBURSED
+        rejectionReason:
+          type: string
+          nullable: true
+        customerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          properties:
+            documentNumber:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+          required:
+            - documentNumber
+            - firstName
+            - lastName
+        installments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Installment"
+      required:
+        - id
+        - amount
+        - termMonths
+        - destination
+        - status
+        - rejectionReason
+        - customerId
+        - createdAt
+        - updatedAt
+        - customer
+        - installments
+    UserCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 8
+          pattern: ^(?=.*[A-Z])(?=.*\d).{8,}$
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - ADVISOR
+            - CASHIER
+      required:
+        - name
+        - email
+        - password
+        - role
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - ADVISOR
+            - CASHIER
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+      minProperties: 1
+    CustomerCreate:
+      type: object
+      properties:
+        documentType:
+          type: string
+          enum:
+            - CC
+            - CE
+            - PASSPORT
+        documentNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        monthlyIncome:
+          type: number
+        address:
+          type: string
+        phone:
+          type: string
+      required:
+        - documentType
+        - documentNumber
+        - firstName
+        - lastName
+        - monthlyIncome
+        - address
+        - phone
+    CustomerUpdate:
+      type: object
+      properties:
+        monthlyIncome:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        address:
+          type: string
+        phone:
+          type: string
+          pattern: ^[0-9]{7,15}$
+      minProperties: 1
+      description: documentNumber y documentType se rechazan si aparecen. Otros campos se ignoran.
+    CreditCreate:
+      type: object
+      properties:
+        documentNumber:
+          type: string
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 100000000
+        termMonths:
+          type: integer
+          minimum: 1
+          maximum: 72
+        destination:
+          type: string
+      required:
+        - documentNumber
+        - amount
+        - termMonths
+        - destination
+    CreditEvaluate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - APPROVED
+            - REJECTED
+        rejectionReason:
+          type: string
+      required:
+        - status
+    PublicCredit:
+      type: object
+      properties:
+        documentType:
+          type: string
+          enum:
+            - CC
+            - CE
+            - PASSPORT
+        documentNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        monthlyIncome:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        amount:
+          type: number
+          minimum: 100000
+          maximum: 100000000
+        termMonths:
+          type: integer
+          minimum: 1
+          maximum: 72
+        destination:
+          type: string
+      required:
+        - documentNumber
+        - firstName
+        - lastName
+        - monthlyIncome
+        - amount
+        - termMonths
+    SimulationInput:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        termMonths:
+          type: integer
+          minimum: 1
+          maximum: 72
+      required:
+        - amount
+        - termMonths
+    Simulation:
+      type: object
+      properties:
+        amount:
+          type: number
+        termMonths:
+          type: integer
+        monthlyInterestRate:
+          type: number
+          example: 0.015
+        monthlyInstallment:
+          type: number
+        totalInterest:
+          type: number
+        totalPayment:
+          type: number
+        schedule:
+          type: array
+          items:
+            type: object
+            properties:
+              installmentNumber:
+                type: integer
+              payment:
+                type: number
+              interest:
+                type: number
+              principal:
+                type: number
+              remainingBalance:
+                type: number
+            required:
+              - installmentNumber
+              - payment
+              - interest
+              - principal
+              - remainingBalance
+      required:
+        - amount
+        - termMonths
+        - monthlyInterestRate
+        - monthlyInstallment
+        - totalInterest
+        - totalPayment
+        - schedule
+    Pending:
+      type: object
+      properties:
+        customer:
+          type: object
+          properties:
+            id:
+              type: integer
+            fullName:
+              type: string
+            documentNumber:
+              type: string
+          required:
+            - id
+            - fullName
+            - documentNumber
+        activeCredits:
+          type: array
+          items:
+            type: object
+            properties:
+              creditRequestId:
+                type: integer
+              amount:
+                type: number
+              pendingInstallments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    installmentId:
+                      type: integer
+                    installmentNumber:
+                      type: integer
+                    dueDate:
+                      type: string
+                      format: date-time
+                    totalAmount:
+                      type: number
+                    paidAmount:
+                      type: number
+                    pendingBalance:
+                      type: number
+                    status:
+                      type: string
+                      enum:
+                        - Pendiente
+                        - Con abono
+                        - Vencida
+                  required:
+                    - installmentId
+                    - installmentNumber
+                    - dueDate
+                    - totalAmount
+                    - paidAmount
+                    - pendingBalance
+                    - status
+            required:
+              - creditRequestId
+              - amount
+              - pendingInstallments
+      required:
+        - customer
+        - activeCredits
+    PaymentInput:
+      type: object
+      properties:
+        installmentId:
+          type: integer
+          minimum: 1
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+      required:
+        - installmentId
+        - amount
+    PaymentResult:
+      type: object
+      properties:
+        receipt:
+          type: object
+          properties:
+            paymentId:
+              type: integer
+            paidAt:
+              type: string
+              format: date-time
+            amountPaid:
+              type: number
+            installmentId:
+              type: integer
+            installmentNumber:
+              type: integer
+            totalInstallmentAmount:
+              type: number
+            paidAmount:
+              type: number
+            remainingBalance:
+              type: number
+            status:
+              type: string
+              enum:
+                - Con abono
+                - Pagada
+          required:
+            - paymentId
+            - paidAt
+            - amountPaid
+            - installmentId
+            - installmentNumber
+            - totalInstallmentAmount
+            - paidAmount
+            - remainingBalance
+            - status
+      required:
+        - receipt
