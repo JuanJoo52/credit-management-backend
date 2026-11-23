@@ -1,7 +1,15 @@
 node_modules
 dist/
 .env
+.env.*
+!.env.example
 .agents/
 .claude/
 .windsurf/
 /generated/prisma
+
+# Archivos temporales usados al preparar la documentación
+/.documentation-*.cjs
+/.prepare-migration.cjs
+/.polish-delivery.cjs
+/.update-delivery-docs.cjs
